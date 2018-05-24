@@ -14,23 +14,64 @@
 %% Constants
 %% ====================================================================
 -define(SERVER, {local, ?MODULE}).
+-define(TOKEN_EXPIRATION_TIME, 3600). % In seconds
+-define(OAUTH2_URL, <<"https://www.googleapis.com/oauth2/v4/token">>).
+-define(FCM_SCOPE, <<"https://www.googleapis.com/auth/firebase.messaging">>).
+-define(GRANT_TYPE, "urn:ietf:params:oauth:grant-type:jwt-bearer").
+
+-export([init/1, handle_call/3, handle_cast/2, terminate/2, code_change/3]).
+-export([start_link/0]).
+-export([setup/2, get_access_token/0]).
 
 %% ====================================================================
 %% API functions
 %% ====================================================================
--export([init/1, handle_call/3, handle_cast/2, terminate/2, code_change/3]).
--export([start_link/0]).
-
 start_link() -> gen_server:start_link(?SERVER, ?MODULE, [], []).
+
+setup(Iss, RsaPrivateKey) ->
+	gen_server:call(?MODULE, {setup, Iss, RsaPrivateKey}).
+
+get_access_token() ->
+	gen_server:call(?MODULE, {get_access_token}).
 
 %% ====================================================================
 %% Behavioural functions
 %% ====================================================================
--record(state, {}).
+-record(state, {iss, rsa_private_key, token, expiration}).
 
 init([]) ->
 	error_logger:info_msg("~p [~p] starting...~n", [?MODULE, self()]),
 	{ok, #state{}}.
+
+handle_call({setup, Iss, RsaPrivateKey}, _From, _State) ->
+	{reply, ok, #state{iss=Iss, rsa_private_key=RsaPrivateKey, expiration=0}};
+
+handle_call({get_access_token}, _From, State=#state{iss=Iss, rsa_private_key=RsaPrivateKey})
+  when not is_binary(Iss); not is_binary(RsaPrivateKey) ->
+	{reply, {error, not_setup}, State};
+
+handle_call({get_access_token}, _From, State=#state{iss=Iss, rsa_private_key=RsaPrivateKey, token=Token, expiration=Expiration}) ->
+	Now = erlang:system_time(seconds),
+	case Now > Expiration of
+		true ->
+			Exp = integer_to_binary(Now + ?TOKEN_EXPIRATION_TIME),
+			Iat = integer_to_binary(Now),
+			Claims = [{iss, Iss}, {scope, ?FCM_SCOPE}, {aud, ?OAUTH2_URL}, {exp, Exp}, {iat, Iat}],
+			Jwt = jwerl:sign(Claims, rs256, RsaPrivateKey),
+			Body = "grant_type=" ++ ?GRANT_TYPE ++ "&assertion=" ++ binary_to_list(Jwt),
+			Request = {binary_to_list(?OAUTH2_URL), [], "application/x-www-form-urlencoded", Body},
+			case httpc:request(post, Request, [], []) of
+				{ok, {{_, 200, _}, _, RespBody}} ->
+					{Json} = jsondoc:decode(RespBody),
+					NewToken = proplists:get_value(<<"access_token">>, Json),
+					{reply, {ok, NewToken}, State#state{token=NewToken, expiration=Now + ?TOKEN_EXPIRATION_TIME}};
+				Other ->
+					error_logger:error_msg("~p:handle_call({get_access_token}, ...): error getting access token: ~p~n", [?MODULE, Other]),
+					{reply, {error, access_token}, State}
+			end;
+		false ->
+			{reply, {ok, Token}, State}
+	end;
 
 handle_call(_Request, _From, State) -> {noreply, State}.
 
