@@ -1,0 +1,17 @@
+%%
+%% Copyright 2018 SysVision, LDA - http://www.sysvision.pt/
+%%
+{application, fcm, [
+	{description, "Firebase Cloud Messaging - HTTP v1 API"},
+	{vsn, "1.0.0"},
+	{registered, []},
+	{mod, {fcm_app, []}},
+	{applications, [
+		jwerl
+	]},
+	{env,[]},
+	{modules, []},
+	{maintainers, []},
+	{licenses, []},
+	{links, []}
+]}.
