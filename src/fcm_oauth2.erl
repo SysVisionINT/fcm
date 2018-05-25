@@ -21,30 +21,33 @@
 
 -export([init/1, handle_call/3, handle_cast/2, terminate/2, code_change/3]).
 -export([start_link/0]).
--export([setup/2, get_access_token/0]).
+-export([setup/3, get_access_token/0, get_project_id/0]).
 
 %% ====================================================================
 %% API functions
 %% ====================================================================
 start_link() -> gen_server:start_link(?SERVER, ?MODULE, [], []).
 
-setup(Iss, RsaPrivateKey) ->
-	gen_server:call(?MODULE, {setup, Iss, RsaPrivateKey}).
+setup(ProjectId, Iss, RsaPrivateKey) ->
+	gen_server:call(?MODULE, {setup, ProjectId, Iss, RsaPrivateKey}).
 
 get_access_token() ->
 	gen_server:call(?MODULE, {get_access_token}).
 
+get_project_id() ->
+	gen_server:call(?MODULE, {get_project_id}).
+
 %% ====================================================================
 %% Behavioural functions
 %% ====================================================================
--record(state, {iss, rsa_private_key, token, expiration}).
+-record(state, {project_id, iss, rsa_private_key, token, expiration}).
 
 init([]) ->
 	error_logger:info_msg("~p [~p] starting...~n", [?MODULE, self()]),
 	{ok, #state{}}.
 
-handle_call({setup, Iss, RsaPrivateKey}, _From, _State) ->
-	{reply, ok, #state{iss=Iss, rsa_private_key=RsaPrivateKey, expiration=0}};
+handle_call({setup, ProjectId, Iss, RsaPrivateKey}, _From, _State) ->
+	{reply, ok, #state{project_id=ProjectId, iss=Iss, rsa_private_key=RsaPrivateKey, expiration=0}};
 
 handle_call({get_access_token}, _From, State=#state{iss=Iss, rsa_private_key=RsaPrivateKey})
   when not is_binary(Iss); not is_binary(RsaPrivateKey) ->
@@ -72,6 +75,11 @@ handle_call({get_access_token}, _From, State=#state{iss=Iss, rsa_private_key=Rsa
 		false ->
 			{reply, {ok, Token}, State}
 	end;
+
+handle_call({get_project_id}, _From, State=#state{project_id=undefined}) ->
+	{reply, {error, not_setup}, State};
+handle_call({get_project_id}, _From, State=#state{project_id=ProjectId}) ->
+	{reply, {ok, ProjectId}, State};
 
 handle_call(_Request, _From, State) -> {noreply, State}.
 
