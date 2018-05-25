@@ -20,7 +20,7 @@ setup(ProjectId, ClientEmail, RsaPrivateKey) ->
 
 send(Message) ->
 	Json = to_json(Message),
-	Body = binary_to_list(jsondoc:encode(Json)),
+	Body = jsondoc:encode(Json),
 	case fcm_oauth2:get_access_token() of
 		{ok, Token} ->
 			Headers = [{"Authorization", "Bearer " ++ binary_to_list(Token)}],
