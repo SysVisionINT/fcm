@@ -26,7 +26,7 @@ After starting fcm, the setup function must be called, before messages can be se
 fcm:setup(ProjectId :: binary(), ClientEmail :: binary(), RsaPrivateKey :: binary()) -> ok | invalid_key.
 ```
 
-The RsaPrivateKey private key must be in the "RSA PRIVATE KEY" format.
+The RsaPrivateKey must be in the "RSA PRIVATE KEY" format.
 To convert the key provided by Google use:
 
 ```
