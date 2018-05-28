@@ -28,12 +28,14 @@
 %% ====================================================================
 -export([setup/3, send/1]).
 
+-spec setup(ProjectId :: binary(), ClientEmail :: binary(), RsaPrivateKey :: binary()) -> ok | invalid_key.
 setup(ProjectId, ClientEmail, RsaPrivateKey) ->
 	case check_rsa_key(RsaPrivateKey) of
 		true -> fcm_oauth2:setup(ProjectId, ClientEmail, RsaPrivateKey);
 		false -> invalid_key
 	end.
 
+-spec send(Message :: #fcm_message{}) -> ok | error.
 send(Message) ->
 	Json = to_json(Message),
 	Body = jsondoc:encode(Json),
